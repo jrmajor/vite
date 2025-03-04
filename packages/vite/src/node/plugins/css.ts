@@ -1425,6 +1425,8 @@ async function compileCSS(
   }
 }
 
+const importPostcssImport = createCachedImport(() => import('postcss-import'))
+const importPostcssModules = createCachedImport(() => import('postcss-modules'))
 async function compilePostCSS(
   environment: PartialEnvironment,
   id: string,
@@ -1609,6 +1611,7 @@ async function transformSugarSS(
   return await callPostcss(environment, id, code, options)
 }
 
+const importPostcss = createCachedImport(() => import('postcss'))
 async function callPostcss(
   environment: PartialEnvironment,
   id: string,
@@ -1727,9 +1730,6 @@ function createCachedImport<T>(imp: () => Promise<T>): () => T | Promise<T> {
     return cached
   }
 }
-const importPostcssImport = createCachedImport(() => import('postcss-import'))
-const importPostcssModules = createCachedImport(() => import('postcss-modules'))
-const importPostcss = createCachedImport(() => import('postcss'))
 
 const preprocessorWorkerControllerCache = new WeakMap<
   ResolvedConfig,
