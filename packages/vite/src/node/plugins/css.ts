@@ -1436,7 +1436,7 @@ async function compilePostCSS(
 ): Promise<
   | {
       code: string
-      map?: Exclude<SourceMapInput, string>
+      map?: ExistingRawSourceMap
       modules?: Record<string, string>
     }
   | undefined
@@ -1597,11 +1597,7 @@ async function compilePostCSS(
     deps,
   )
 
-  return {
-    map: { mappings: '' },
-    ...postcssResult,
-    modules,
-  }
+  return { ...postcssResult, modules }
 }
 
 async function transformSugarSS(
@@ -3385,7 +3381,7 @@ async function compileLightningCSS(
   urlResolver?: CssUrlResolver,
 ): Promise<{
   code: string
-  map?: string | undefined
+  map: string | undefined
   modules?: Record<string, string>
 }> {
   const { config } = environment
