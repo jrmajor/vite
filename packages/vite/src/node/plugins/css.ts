@@ -1442,7 +1442,7 @@ async function compilePostCSS(
   | undefined
 > {
   const { config } = environment
-  const { modules: modulesOptions, devSourcemap } = config.css
+  const { modules: modulesOptions } = config.css
   const isModule = modulesOptions !== false && cssModuleRE.test(id)
   // although at serve time it can work without processing, we do need to
   // crawl them in order to register watch dependencies.
@@ -1588,15 +1588,54 @@ async function compilePostCSS(
     return
   }
 
+  const postcssResult = await callPostcss(
+    environment,
+    id,
+    code,
+    { ...postcssOptions, parser: postcssParser },
+    postcssPlugins,
+    deps,
+  )
+
+  return {
+    map: { mappings: '' },
+    ...postcssResult,
+    modules,
+  }
+}
+
+async function transformSugarSS(
+  environment: PartialEnvironment,
+  id: string,
+  code: string,
+) {
+  const options = { parser: loadSss(environment.config.root) }
+  return await callPostcss(environment, id, code, options)
+}
+
+async function callPostcss(
+  environment: PartialEnvironment,
+  id: string,
+  code: string,
+  options: PostCSS.ProcessOptions<PostCSS.Document | PostCSS.Root>,
+  plugins: PostCSS.AcceptedPlugin[] = [],
+  deps: Set<string> | null = null,
+): Promise<{
+  code: string
+  map?: ExistingRawSourceMap
+}> {
+  const { config } = environment
+  const { devSourcemap } = config.css
+
   let postcssResult: PostCSS.Result
+
   try {
     const source = removeDirectQuery(id)
     const postcss = await importPostcss()
 
     // postcss is an unbundled dep and should be lazy imported
-    postcssResult = await postcss.default(postcssPlugins).process(code, {
-      ...postcssOptions,
-      parser: postcssParser,
+    postcssResult = await postcss.default(plugins).process(code, {
+      ...options,
       to: source,
       from: source,
       ...(devSourcemap
@@ -1616,9 +1655,9 @@ async function compilePostCSS(
 
     // record CSS dependencies from @imports
     for (const message of postcssResult.messages) {
-      if (message.type === 'dependency') {
+      if (deps && message.type === 'dependency') {
         deps.add(normalizePath(message.file as string))
-      } else if (message.type === 'dir-dependency') {
+      } else if (deps && message.type === 'dir-dependency') {
         // https://github.com/postcss/postcss/blob/main/docs/guidelines/plugin.md#3-dependencies
         const { dir, glob: globPattern = '**' } = message
         const files = globSync(globPattern, {
@@ -1663,107 +1702,20 @@ async function compilePostCSS(
   if (!devSourcemap) {
     return {
       code: postcssResult.css,
-      map: { mappings: '' },
-      modules,
     }
   }
 
-  const rawPostcssMap = postcssResult.map.toJSON()
-  const postcssMap = await formatPostcssSourceMap(
+  const rawMap = postcssResult.map.toJSON()
+  const map = await formatPostcssSourceMap(
     // version property of rawPostcssMap is declared as string
     // but actually it is a number
-    rawPostcssMap as Omit<RawSourceMap, 'version'> as ExistingRawSourceMap,
+    rawMap as Omit<RawSourceMap, 'version'> as ExistingRawSourceMap,
     cleanUrl(id),
   )
 
   return {
     code: postcssResult.css,
-    map: postcssMap,
-    modules,
-  }
-}
-
-// TODO: dedupe
-async function transformSugarSS(
-  environment: PartialEnvironment,
-  id: string,
-  code: string,
-) {
-  const { config } = environment
-  const { devSourcemap } = config.css
-
-  let postcssResult: PostCSS.Result
-  try {
-    const source = removeDirectQuery(id)
-    const postcss = await importPostcss()
-    // postcss is an unbundled dep and should be lazy imported
-    postcssResult = await postcss.default().process(code, {
-      parser: loadSss(config.root),
-      to: source,
-      from: source,
-      ...(devSourcemap
-        ? {
-            map: {
-              inline: false,
-              annotation: false,
-              // postcss may return virtual files
-              // we cannot obtain content of them, so this needs to be enabled
-              sourcesContent: true,
-              // when "prev: preprocessorMap", the result map may include duplicate filename in `postcssResult.map.sources`
-              // prev: preprocessorMap,
-            },
-          }
-        : {}),
-    })
-
-    for (const message of postcssResult.messages) {
-      if (message.type === 'warning') {
-        const warning = message as PostCSS.Warning
-        let msg = `[vite:css] ${warning.text}`
-        msg += `\n${generateCodeFrame(
-          code,
-          {
-            line: warning.line,
-            column: warning.column - 1, // 1-based
-          },
-          warning.endLine !== undefined && warning.endColumn !== undefined
-            ? {
-                line: warning.endLine,
-                column: warning.endColumn - 1, // 1-based
-              }
-            : undefined,
-        )}`
-        environment.logger.warn(colors.yellow(msg))
-      }
-    }
-  } catch (e) {
-    e.message = `[postcss] ${e.message}`
-    e.code = code
-    e.loc = {
-      file: e.file,
-      line: e.line,
-      column: e.column - 1, // 1-based
-    }
-    throw e
-  }
-
-  if (!devSourcemap) {
-    return {
-      code: postcssResult.css,
-    }
-  }
-
-  const rawPostcssMap = postcssResult.map.toJSON()
-  const postcssMap = await formatPostcssSourceMap(
-    // version property of rawPostcssMap is declared as string
-    // but actually it is a number
-    rawPostcssMap as Omit<RawSourceMap, 'version'> as ExistingRawSourceMap,
-    cleanUrl(id),
-  )
-
-  return {
-    code: postcssResult.css,
-    map: postcssMap,
+    map,
   }
 }
 
