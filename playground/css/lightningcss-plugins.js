@@ -97,7 +97,7 @@ export function testSourceInput() {
                     },
                   ],
                 },
-                loc: rule.loc,
+                loc: location,
               },
             },
           ]
@@ -167,6 +167,43 @@ export function nestedLikePlugin() {
           rule.value.rules = filteredNestedRules
         }
         return [rule, ...additionalRules]
+      },
+    },
+  }
+}
+
+/** @returns {import('lightningcss').Visitor} */
+export function testInjectUrl() {
+  return {
+    Rule: {
+      unknown: {
+        'inject-url': (rule) => {
+          return [
+            {
+              type: 'style',
+              value: {
+                selectors: [[{ type: 'class', name: 'inject-url' }]],
+                declarations: {
+                  declarations: [
+                    {
+                      property: 'background-image',
+                      value: [
+                        {
+                          type: 'url',
+                          value: {
+                            url: '=/ok.png',
+                            loc: rule.loc,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+                loc: rule.loc,
+              },
+            },
+          ]
+        },
       },
     },
   }

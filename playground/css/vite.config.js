@@ -6,6 +6,7 @@ import { composeVisitors } from 'lightningcss'
 import {
   nestedLikePlugin,
   testDirDep,
+  testInjectUrl,
   testSourceInput,
 } from './lightningcss-plugins'
 
@@ -90,6 +91,7 @@ export default defineConfig({
         nestedLikePlugin(),
         testDirDep(),
         testSourceInput(),
+        testInjectUrl(),
       ]),
     },
     modules: {

@@ -76,8 +76,8 @@ test('postcss config', async () => {
   await untilUpdated(() => getColor(imported), 'red')
 })
 
-test('postcss plugin that injects url()', async () => {
-  const imported = await page.$('.postcss-inject-url')
+test('transformer plugin that injects url()', async () => {
+  const imported = await page.$('.inject-url')
   // alias should be resolved
   expect(await getBg(imported)).toMatch(
     /localhost(?::\d+)?\/(?:assets\/)?ok.*\.png/,
